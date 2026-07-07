@@ -1,0 +1,235 @@
+-- Load Rayfield Library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local localPlayer = Players.LocalPlayer
+local reloadRemote = ReplicatedStorage:WaitForChild("Resources"):WaitForChild("Events"):WaitForChild("Client"):WaitForChild("ReloadGun")
+local gunsFolder = ReplicatedStorage:WaitForChild("Resources"):WaitForChild("ViewmodelGuns")
+
+-- Path Folder Target ESP
+local targetFolder = Workspace:WaitForChild("WorkspaceScriptable")
+	:WaitForChild("Storage")
+	:WaitForChild("NormalStorage")
+	:WaitForChild("NPCWorkspace")
+
+-- Path Proximity Prompt untuk Ammo Refill
+local ammoPrompt = Workspace:WaitForChild("WorkspaceScriptable")
+	:WaitForChild("AmmoRefill")
+	:WaitForChild("PromptAttachment")
+	:WaitForChild("ProximityPrompt")
+
+-- State global
+local ESP_ENABLED = false
+local AUTO_RELOAD_ENABLED = false
+local INF_AMMO_ENABLED = false
+local SELECTED_GUNS = {} 
+local activeConnections = {}
+
+--- ==========================================
+--- FUNGSI UTILITAS AMBIL DAFTAR SENJATA
+--- ==========================================
+local function getGunList()
+	local list = {}
+	for _, gun in ipairs(gunsFolder:GetChildren()) do
+		table.insert(list, gun.Name)
+	end
+	return list
+end
+
+--- ==========================================
+--- FUNGSI ESP
+--- ==========================================
+local function clearAllESP()
+	for _, child in ipairs(targetFolder:GetChildren()) do
+		for _, descendant in ipairs(child:GetDescendants()) do
+			if descendant.Name == "ItemESP" and descendant:IsA("BillboardGui") then
+				descendant:Destroy()
+			end
+		end
+	end
+end
+
+local function createESP(targetPart, displayName)
+	if not targetPart or targetPart:FindFirstChild("ItemESP") then return end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ItemESP"
+	billboard.Size = UDim2.new(0, 150, 0, 40)
+	billboard.StudsOffset = Vector3.new(0, 3, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = targetPart
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Size = UDim2.new(1, 0, 1, 0)
+	textLabel.BackgroundTransparency = 1
+	textLabel.Text = displayName
+	textLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+	textLabel.TextSize = 16
+	textLabel.Font = Enum.Font.SourceSansBold
+	textLabel.TextStrokeTransparency = 0
+	textLabel.Parent = billboard
+end
+
+local function findValidPart(object)
+	if object:IsA("BasePart") then return object end
+	if object:IsA("Model") then return object.PrimaryPart or object:FindFirstChildWhichIsA("BasePart") end
+	return object:FindFirstChildWhichIsA("BasePart")
+end
+
+local function scanForItems()
+	if not ESP_ENABLED then return end
+	for _, child in ipairs(targetFolder:GetChildren()) do
+		local xrayVisible = child:FindFirstChild("XrayVisible")
+		if xrayVisible then
+			local anyItem = xrayVisible:GetChildren()[1]
+			if anyItem then
+				local partToAttach = findValidPart(anyItem) or findValidPart(child) or findValidPart(xrayVisible)
+				if partToAttach then
+					createESP(partToAttach, "📦 " .. anyItem.Name)
+				end
+			end
+		end
+	end
+end
+
+local function updateESPState(state)
+	ESP_ENABLED = state
+	for _, conn in ipairs(activeConnections) do
+		if conn then conn:Disconnect() end
+	end
+	activeConnections = {}
+	
+	if ESP_ENABLED then
+		scanForItems()
+		local conn = targetFolder.ChildAdded:Connect(function()
+			task.wait(0.5)
+			if ESP_ENABLED then scanForItems() end
+		end)
+		table.insert(activeConnections, conn)
+	else
+		clearAllESP()
+	end
+end
+
+--- ==========================================
+--- FUNGSI AUTO RELOAD
+--- ==========================================
+local function isGunSelected(gunName)
+	if SELECTED_GUNS[gunName] == true then return true end
+	for _, name in ipairs(SELECTED_GUNS) do
+		if name == gunName then return true end
+	end
+	return false
+end
+
+local function startAutoReloadLoop()
+	while AUTO_RELOAD_ENABLED do
+		local character = localPlayer.Character
+		if character then
+			for _, item in ipairs(character:GetChildren()) do
+				if isGunSelected(item.Name) then
+					local args = { item }
+					reloadRemote:FireServer(unpack(args))
+				end
+			end
+		end
+		task.wait()
+	end
+end
+
+--- ==========================================
+--- FUNGSI INF AMMO
+--- ==========================================
+local function startInfAmmoLoop()
+	while INF_AMMO_ENABLED do
+		if ammoPrompt and ammoPrompt:IsA("ProximityPrompt") then
+			fireproximityprompt(ammoPrompt)
+		end
+		task.wait()
+	end
+end
+
+--- ==========================================
+--- RAYFIELD UI CREATION
+--- ==========================================
+local Window = Rayfield:CreateWindow({
+   Name = "idk",
+   LoadingTitle = "Loading Menu...",
+   LoadingSubtitle = "by zjzok",
+   Theme = "Default"
+})
+
+local MainTab = Window:CreateTab("Features", 4483362458)
+
+-- Feature 1: Item ESP
+local ItemESPToggle = MainTab:CreateToggle({
+   Name = "Enable Item ESP",
+   CurrentValue = false,
+   Flag = "ItemESP_Toggle",
+   Callback = function(Value)
+      updateESPState(Value)
+   end,
+})
+
+-- Feature 2: Multi-Dropdown Pilih Senjata
+local GunDropdown = MainTab:CreateDropdown({
+   Name = "Select Guns for Auto Reload",
+   Options = getGunList(),
+   CurrentOption = {}, 
+   MultipleOptions = true, 
+   Flag = "WeaponMultiSelect",
+   Callback = function(Options)
+      SELECTED_GUNS = Options
+   end,
+})
+
+-- Feature 3: Auto Reload Toggle
+local AutoReloadToggle = MainTab:CreateToggle({
+   Name = "Auto Reload",
+   CurrentValue = false,
+   Flag = "AutoReload_Toggle",
+   Callback = function(Value)
+      AUTO_RELOAD_ENABLED = Value
+      if AUTO_RELOAD_ENABLED then
+          task.spawn(startAutoReloadLoop)
+      end
+   end,
+})
+
+-- Feature 4: Inf Ammo (Auto Refill)
+local InfAmmoToggle = MainTab:CreateToggle({
+   Name = "Inf Ammo",
+   CurrentValue = false,
+   Flag = "InfAmmo_Toggle",
+   Callback = function(Value)
+      INF_AMMO_ENABLED = Value
+      if INF_AMMO_ENABLED then
+          task.spawn(startInfAmmoLoop)
+      end
+   end,
+})
+
+-- Notifikasi bawaan Rayfield UI
+Rayfield:Notify({
+   Title = "Menu Loaded!",
+   Content = "Script siap digunakan.",
+   Duration = 4,
+   Image = 4483362458,
+})
+
+--- ==========================================
+--- COBALT DIALOGUE TRIGGER (WELCOME EFFECT)
+--- ==========================================
+-- Kode ini otomatis berjalan tepat setelah UI Rayfield berhasil dibuat di atas
+local DialogueEvent = ReplicatedStorage:WaitForChild("Resources")
+	:WaitForChild("Events")
+	:WaitForChild("Client")
+	:WaitForChild("UI")
+	:WaitForChild("Dialogue")
+
+if DialogueEvent then
+	firesignal(DialogueEvent.OnClientEvent, "ty for using the script 🗿")
+end
