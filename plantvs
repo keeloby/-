@@ -4,8 +4,8 @@
 local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "vvu - Multi Hub (Fuse & Farming) 🗿",
-   LoadingTitle = "Loading Automation Engine...",
+   Name = "vvu - 😋✌",
+   LoadingTitle = "Loading ",
    Theme = "Default"
 })
 
