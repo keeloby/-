@@ -1,0 +1,209 @@
+-- ==========================================
+-- LINK RAYFIELD GITHUB DIRECT
+-- ==========================================
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "vvu - Multi Hub (Fuse & Farming) 🗿",
+   LoadingTitle = "Loading Automation Engine...",
+   Theme = "Default"
+})
+
+-- Membuat Tab Baru
+local FuseTab = Window:CreateTab("Auto Fuse", 4483362458)
+local FarmTab = Window:CreateTab("Farming & Dupe", 4483362458)
+
+-- State global
+local AUTO_FUSE_TOGGLE = false
+local AUTO_BUY_TOGGLE = false
+local AUTO_SELL_TOGGLE = false
+local AUTO_DUPE_TOGGLE = false
+local TARGET_PLOT = "1" 
+
+-- ==========================================
+-- SYSTEM INITIALIZATION (AUTO FUSE ENGINE)
+-- ==========================================
+task.spawn(function()
+    local Workspace = game:GetService("Workspace")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    
+    local netFolder = ReplicatedStorage:WaitForChild("_Net", 5)
+    local movePackEvent = netFolder and netFolder:WaitForChild("MovePack", 5)
+
+    local function findPackVisualAndName(slot)
+        if not slot then return nil, nil end
+        for _, child in ipairs(slot:GetChildren()) do
+            local packVisual = child:FindFirstChild("PackVisual")
+            if packVisual then
+                local item = packVisual:FindFirstChildWhichIsA("Model") 
+                    or packVisual:FindFirstChildWhichIsA("MeshPart") 
+                    or packVisual:FindFirstChildWhichIsA("BasePart")
+                if item then
+                    return packVisual, item.Name
+                end
+            end
+        end
+        return nil, nil
+    end
+
+    while true do
+        if AUTO_FUSE_TOGGLE and movePackEvent then
+            local map = Workspace:FindFirstChild("Map")
+            local plots = map and map:FindFirstChild("Plots")
+            local myPlot = plots and plots:FindFirstChild(TARGET_PLOT)
+            local functionals = myPlot and myPlot:FindFirstChild("Functionals")
+            local interactibles = functionals and functionals:FindFirstChild("Interactibles")
+            local mergeSlots = interactibles and interactibles:FindFirstChild("MergeSlots")
+
+            if mergeSlots then
+                local itemScanList = {}
+                for _, slot in ipairs(mergeSlots:GetChildren()) do
+                    local slotNumber = tonumber(slot.Name)
+                    if slotNumber then
+                        local packVisual, itemName = findPackVisualAndName(slot)
+                        if itemName and itemName ~= "RedIce" then
+                            if not itemScanList[itemName] then
+                                itemScanList[itemName] = {}
+                            end
+                            table.insert(itemScanList[itemName], slotNumber)
+                        end
+                    end
+                end
+
+                local fusedThisCycle = false
+                for itemName, slotsFound in pairs(itemScanList) do
+                    if #slotsFound >= 2 then
+                        local args = {slotsFound[1], slotsFound[2]}
+                        movePackEvent:FireServer(unpack(args))
+                        fusedThisCycle = true
+                        task.wait(0.35)
+                        break 
+                    end
+                end
+                if not fusedThisCycle then task.wait(0.25) end
+            else
+                task.wait(0.5)
+            end
+        else
+            task.wait(0.4)
+        end
+    end
+end)
+
+-- ==========================================
+-- AUTO BUY ENGINE
+-- ==========================================
+task.spawn(function()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local netFolder = ReplicatedStorage:WaitForChild("_Net", 5)
+    local buyPackEvent = netFolder and netFolder:WaitForChild("BuyPack", 5)
+
+    while true do
+        if AUTO_BUY_TOGGLE and buyPackEvent then
+            buyPackEvent:FireServer()
+            task.wait(0.3) -- Jeda pembelian agar slot tidak langsung kepenuhan dan crash
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- ==========================================
+-- AUTO SELL ENGINE
+-- ==========================================
+task.spawn(function()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local netFolder = ReplicatedStorage:WaitForChild("_Net", 5)
+    local sellAllEvent = netFolder and netFolder:WaitForChild("SellAllHeld", 5)
+
+    while true do
+        if AUTO_SELL_TOGGLE and sellAllEvent then
+            sellAllEvent:FireServer()
+            task.wait(0.5)
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- ==========================================
+-- DUPE ENGINE
+-- ==========================================
+task.spawn(function()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local netFolder = ReplicatedStorage:WaitForChild("_Net", 5)
+    local plantPackEvent = netFolder and netFolder:WaitForChild("PlantPack", 5)
+
+    while true do
+        if AUTO_DUPE_TOGGLE and plantPackEvent then
+            local args = {
+                1,
+                5
+            }
+            plantPackEvent:FireServer(unpack(args))
+            task.wait(0.1)
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- ==========================================
+-- TAB 1: AUTO FUSE INTERFACE
+-- ==========================================
+FuseTab:CreateToggle({
+   Name = "Aktifkan Auto Fuse (Ignore RedIce)",
+   CurrentValue = false,
+   Flag = "Toggle_Auto_Fuse_Final",
+   Callback = function(Value)
+      AUTO_FUSE_TOGGLE = Value
+   end,
+})
+
+FuseTab:CreateToggle({
+   Name = "Auto Buy",
+   CurrentValue = false,
+   Flag = "Toggle_Auto_Buy_Pack",
+   Callback = function(Value)
+      AUTO_BUY_TOGGLE = Value
+      if AUTO_BUY_TOGGLE then
+          Rayfield:Notify({Title = "Auto Buy", Content = "Mulai membeli pack otomatis! 🛒", Duration = 2})
+      end
+   end,
+})
+
+FuseTab:CreateInput({
+   Name = "Nomor Plot Kamu",
+   PlaceholderText = "Contoh: 1",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+      TARGET_PLOT = tostring(Text)
+   end,
+})
+
+-- ==========================================
+-- TAB 2: FARMING & DUPE INTERFACE
+-- ==========================================
+FarmTab:CreateToggle({
+   Name = "Dupe (Slot 1)",
+   CurrentValue = false,
+   Flag = "Toggle_Dupe_Plant",
+   Callback = function(Value)
+      AUTO_DUPE_TOGGLE = Value
+      if AUTO_DUPE_TOGGLE then
+          Rayfield:Notify({Title = "Dupe Status", Content = "Dupe diaktifkan! 💸", Duration = 2})
+      end
+   end,
+})
+
+FarmTab:CreateToggle({
+   Name = "Auto Sell All",
+   CurrentValue = false,
+   Flag = "Toggle_Auto_Sell_All",
+   Callback = function(Value)
+      AUTO_SELL_TOGGLE = Value
+      if AUTO_SELL_TOGGLE then
+          Rayfield:Notify({Title = "Auto Sell", Content = "Otomatis menjual barang bawaan aktif! 💰", Duration = 2})
+      end
+   end,
+})
