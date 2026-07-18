@@ -1,0 +1,44 @@
+-- ========================================================
+-- ALL WEAPONS SUPER OP MODIFIER (MATH.HUGE VERSION)
+-- ========================================================
+
+local weaponFolder = game:GetService("ReplicatedStorage").Shared.WeaponSystem.WeaponData
+
+if weaponFolder then
+    local modifiedCount = 0
+    
+    for _, moduleScript in ipairs(weaponFolder:GetChildren()) do
+        if moduleScript:IsA("ModuleScript") then
+            local success, weaponData = pcall(function() 
+                return require(moduleScript) 
+            end)
+            
+            if success and type(weaponData) == "table" then
+                -- 1. Stats Utama (One Shot + Infinite Ammo + Insane Fire Rate)
+                weaponData["Damage"] = 9999
+                weaponData["MagSize"] = math.huge -- 📌 Peluru tak terhingga
+                weaponData["ReloadTime"] = 0
+                weaponData["RateOfFire"] = 6000 -- 📌 Jauh lebih cepat (Bisa diganti math.huge jika ingin instan)
+                
+                -- Proteksi amunisi tambahan jika ada di dalam modul
+                if weaponData["Ammo"] ~= nil then weaponData["Ammo"] = math.huge end
+                if weaponData["MaxAmmo"] ~= nil then weaponData["MaxAmmo"] = math.huge end
+                
+                -- 2. No Recoil & No Spread (Akurasi Lurus 100%)
+                weaponData["Spread"] = 0
+                weaponData["KickForce"] = 0
+                weaponData["ClimbPerShot"] = 0
+                weaponData["MaxClimb"] = 0
+                weaponData["ShakeMagnitude"] = 0
+                weaponData["ShakeRoughness"] = 0
+                weaponData["BloomPerShot"] = 0
+                weaponData["MaxBloom"] = 0
+                
+                modifiedCount = modifiedCount + 1
+            end
+        end
+    end
+    print("✅ Berhasil! " .. tostring(modifiedCount) .. " senjata di WeaponData sekarang pakai math.huge & RateOfFire super cepat!")
+else
+    warn("❌ Gagal: Path folder WeaponData tidak ditemukan!")
+end
